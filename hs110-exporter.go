@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -14,10 +15,15 @@ import (
 )
 
 var (
-	hs110Miliwatts = prometheus.NewGauge(prometheus.GaugeOpts{
+	hs110Miliwatts = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hs110_miliwatts",
 		Help: "The number of miliwatts passing through HS110 in the last minute",
-	})
+	},
+		[]string{
+			// target hostname or IP
+			"target",
+		},
+	)
 )
 
 type hs110 struct {
@@ -70,11 +76,15 @@ type hs110 struct {
 func recordMetrics() {
 	go func() {
 		for {
+			targetHS110 := os.Getenv("TARGET-HS110")
 			// for TARGET-HS110 env variable use DNS or IP
-			plug := hs1xxplug.Hs1xxPlug{IPAddress: os.Getenv("TARGET-HS110")}
+			plug := hs1xxplug.Hs1xxPlug{IPAddress: targetHS110}
 			results, err := plug.MeterInfo()
 			if err != nil {
-				log.Println("err:", err)
+				log.Println("Target not responding - err:", err)
+				// if target not responding sleep
+				time.Sleep(1 * time.Minute)
+				continue
 			}
 
 			var meterInfo hs110
@@ -82,9 +92,21 @@ func recordMetrics() {
 			err = json.Unmarshal([]byte(results), &meterInfo) // here!
 
 			if err != nil {
-				log.Println(err)
+				log.Println("Target not a HS110 - err:", err)
+				// if target not responding sleep
+				time.Sleep(1 * time.Minute)
+				continue
 			}
-			hs110Miliwatts.Set(float64(meterInfo.Emeter.GetRealtime.PowerMw))
+			powerMw := meterInfo.Emeter.GetRealtime.PowerMw
+			// a HS100 will return 0
+			if powerMw != 0 {
+				log.Printf("Target '%s' HS110 microwatts are '%d'\n", targetHS110, powerMw)
+				hs110Miliwatts.WithLabelValues(targetHS110).Set(float64(powerMw))
+			} else {
+				log.Println("Target not a HS110 - err:", err)
+				// if target not responding sleep
+				time.Sleep(1 * time.Minute)
+			}
 		}
 	}()
 }
