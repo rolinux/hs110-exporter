@@ -15,6 +15,34 @@ import (
 )
 
 var (
+	hs110RelayState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hs110_relay_state",
+		Help: "Plug On or Off state",
+	},
+		[]string{
+			// target hostname or IP
+			"target",
+			// MAC address of the plug
+			"mac",
+			// plug alias
+			"alias",
+		},
+	)
+
+	hs110OnTime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hs110_on_time",
+		Help: "The number of seconds from the last relay_state change to On",
+	},
+		[]string{
+			// target hostname or IP
+			"target",
+			// MAC address of the plug
+			"mac",
+			// plug alias
+			"alias",
+		},
+	)
+
 	hs110VoltageMilliVolts = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hs110_voltage_milivolts",
 		Help: "The number of voltage millivolts passing through HS110 in the last minute",
@@ -145,6 +173,12 @@ func recordMetrics() {
 				continue
 			}
 
+			// relay_state 1 or 0
+			relayState := meterInfo.System.GetSysinfo.RelayState
+
+			// On time (uptime in seconds)
+			onTime := meterInfo.System.GetSysinfo.OnTime
+
 			// MAC address
 			mac := meterInfo.System.GetSysinfo.MAC
 
@@ -163,17 +197,28 @@ func recordMetrics() {
 			// total watt hours
 			totalWh := meterInfo.Emeter.GetRealtime.TotalWh
 
+			// this should be set
+			log.Printf("Target '%s' HS110 relay_state is '%d' boolean\n", targetHS110, relayState)
+			hs110RelayState.WithLabelValues(targetHS110, mac, alias).Set(float64(relayState))
+
+			// this should be set
+			log.Printf("Target '%s' HS110 on_time is '%d' seconds\n", targetHS110, onTime)
+			hs110OnTime.WithLabelValues(targetHS110, mac, alias).Set(float64(onTime))
+
 			// a HS100 will return 0
-			if powerMw != 0 {
-				log.Printf("Target '%s' HS110 millivolts are '%d'\n", targetHS110, voltageMv)
-				hs110VoltageMilliVolts.WithLabelValues(targetHS110, mac, alias).Set(float64(voltageMv))
-				log.Printf("Target '%s' HS110 milliamps are '%d'\n", targetHS110, currentMa)
-				hs110CurrentMilliAmps.WithLabelValues(targetHS110, mac, alias).Set(float64(currentMa))
-				log.Printf("Target '%s' HS110 milliwatts are '%d'\n", targetHS110, powerMw)
-				hs110PowerMilliWatts.WithLabelValues(targetHS110, mac, alias).Set(float64(powerMw))
+			if totalWh != 0 {
+				// totalWh can still be above 0 with current powerMw == 0
 				log.Printf("Target '%s' HS110 watthours are '%d'\n", targetHS110, totalWh)
 				hs110TotalWattHours.WithLabelValues(targetHS110, mac, alias).Set(float64(totalWh))
 
+				if powerMw != 0 {
+					log.Printf("Target '%s' HS110 millivolts are '%d'\n", targetHS110, voltageMv)
+					hs110VoltageMilliVolts.WithLabelValues(targetHS110, mac, alias).Set(float64(voltageMv))
+					log.Printf("Target '%s' HS110 milliamps are '%d'\n", targetHS110, currentMa)
+					hs110CurrentMilliAmps.WithLabelValues(targetHS110, mac, alias).Set(float64(currentMa))
+					log.Printf("Target '%s' HS110 milliwatts are '%d'\n", targetHS110, powerMw)
+					hs110PowerMilliWatts.WithLabelValues(targetHS110, mac, alias).Set(float64(powerMw))
+				}
 			} else {
 				log.Println("Target not a HS110 - err:", err)
 				// if target not responding sleep
@@ -185,6 +230,8 @@ func recordMetrics() {
 
 func init() {
 	// Metrics have to be registered to be exposed:
+	prometheus.MustRegister(hs110RelayState)
+	prometheus.MustRegister(hs110OnTime)
 	prometheus.MustRegister(hs110VoltageMilliVolts)
 	prometheus.MustRegister(hs110CurrentMilliAmps)
 	prometheus.MustRegister(hs110PowerMilliWatts)
