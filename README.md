@@ -2,7 +2,9 @@
 
 There are existing hs110-exporters written in other programming languages but due to [Sau Sheong Chang hsxxx Go library](https://github.com/sausheong/hs1xxplug) I decided to write my own exporter that is supposed to use less resources (CPU, memory and disk).
 
-Please feedback if the metrics are not of the right type or you found any issues we can fix. The exporter has been run for several months against 3 plugs (1 container per plug) without any obvious issues.
+Please [feedback](https://github.com/rolinux/hs110-exporter/issues) if the metrics are not of the right type or you found any issues we can fix.
+
+The exporter has been running for several months against 3 plugs (1 container per plug) without any obvious issues.
 
 I run my hs110-exporter(s) using a command like:
 
