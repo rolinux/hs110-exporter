@@ -9,13 +9,13 @@ The exporter has been running for several months against 3 plugs (1 container pe
 I run my hs110-exporter(s) using a command like:
 
 ```
-$ sudo docker run -dit --restart always -e TARGET-HS110=192.168.252.57 \
+$ sudo docker run -dit --restart always -e TARGET_HS110=192.168.252.57 \
  -p 9498:9498 --name hs110-exporter-57 rolinux/hs110-exporter:latest
 ```
 
 Notes:
 
-1. the `TARGET-HS110` environment variable is the target plug IP or hostname.
+1. the `TARGET_HS110` environment variable is the target plug IP or hostname.
 1. if you have multiple plugs you have to increase the host port number (for example `-p 9499:9498` and/or `-p 9500:9498`)
 
 The plan is to provide on docker.io/rolinux/hs110-exporter version for AMD64, ARM64 and ARM but if you need another architecture that is supported by Go and docker buildx then I will try to add it.

@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -151,7 +153,7 @@ type hs110 struct {
 func recordMetrics() {
 	go func() {
 		for {
-			targetHS110 := os.Getenv("TARGET-HS110")
+			targetHS110 := os.Getenv("TARGET_HS110")
 			// for TARGET-HS110 env variable use DNS or IP
 			plug := hs1xxplug.Hs1xxPlug{IPAddress: targetHS110}
 			results, err := plug.MeterInfo()
@@ -163,6 +165,8 @@ func recordMetrics() {
 			}
 
 			var meterInfo hs110
+
+			logSlice := []string{}
 
 			err = json.Unmarshal([]byte(results), &meterInfo) // here!
 
@@ -198,29 +202,33 @@ func recordMetrics() {
 			totalWh := meterInfo.Emeter.GetRealtime.TotalWh
 
 			// this should be set
-			log.Printf("Target '%s' HS110 relay_state is '%d' boolean\n", targetHS110, relayState)
+			logSlice = append(logSlice, fmt.Sprintf("relay_state:%d", relayState))
 			hs110RelayState.WithLabelValues(targetHS110, mac, alias).Set(float64(relayState))
 
 			// this should be set
-			log.Printf("Target '%s' HS110 on_time is '%d' seconds\n", targetHS110, onTime)
+			logSlice = append(logSlice, fmt.Sprintf("on_time:%d", onTime))
 			hs110OnTime.WithLabelValues(targetHS110, mac, alias).Set(float64(onTime))
 
 			// a HS100 will return 0
 			if totalWh != 0 {
 				// totalWh can still be above 0 with current powerMw == 0
-				log.Printf("Target '%s' HS110 watthours are '%d'\n", targetHS110, totalWh)
+				logSlice = append(logSlice, fmt.Sprintf("watthours:%d", totalWh))
 				hs110TotalWattHours.WithLabelValues(targetHS110, mac, alias).Set(float64(totalWh))
 
 				if powerMw != 0 {
-					log.Printf("Target '%s' HS110 millivolts are '%d'\n", targetHS110, voltageMv)
+					logSlice = append(logSlice, fmt.Sprintf("millivolts:%d", voltageMv))
 					hs110VoltageMilliVolts.WithLabelValues(targetHS110, mac, alias).Set(float64(voltageMv))
-					log.Printf("Target '%s' HS110 milliamps are '%d'\n", targetHS110, currentMa)
+
+					logSlice = append(logSlice, fmt.Sprintf("milliamps:%d", currentMa))
 					hs110CurrentMilliAmps.WithLabelValues(targetHS110, mac, alias).Set(float64(currentMa))
-					log.Printf("Target '%s' HS110 milliwatts are '%d'\n", targetHS110, powerMw)
+
+					logSlice = append(logSlice, fmt.Sprintf("milliwatts:%d", powerMw))
 					hs110PowerMilliWatts.WithLabelValues(targetHS110, mac, alias).Set(float64(powerMw))
 				}
+				log.Printf("Target '%s' HS110 data: %s\n", targetHS110, strings.Join(logSlice, " "))
 			} else {
-				log.Println("Target not a HS110 - err:", err)
+				log.Printf("Target '%s' HS110 data: %s\n", targetHS110, strings.Join(logSlice, " "))
+				log.Printf("Target '%s' not a HS110 - err: %v\n", targetHS110, err)
 				// if target not responding sleep
 				time.Sleep(1 * time.Minute)
 			}
