@@ -226,10 +226,10 @@ func recordMetrics() {
 					hs110PowerMilliWatts.WithLabelValues(targetHS110, mac, alias).Set(float64(powerMw))
 				}
 				log.SetOutput(os.Stdout)
-				log.Printf("Target '%s' HS110 data: %s", targetHS110, strings.Join(logSlice, " "))
+				log.Printf("Target '%s' HS110 data: %s ", targetHS110, strings.Join(logSlice, " "))
 			} else {
 				log.SetOutput(os.Stdout)
-				log.Printf("Target '%s' HS110 data: %s", targetHS110, strings.Join(logSlice, " "))
+				log.Printf("Target '%s' HS110 data: %s ", targetHS110, strings.Join(logSlice, " "))
 				log.SetOutput(os.Stderr)
 				log.Printf("Target '%s' not a HS110 - err: %v", targetHS110, err)
 				// if target not responding sleep
