@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CodeBuild
+Parameters:
+  # Namespace for the ECR public repository
+  ECRPublicNamespace:
+    Description: Namespace for the ECR public repository
+    Default: s1u7z9t3
+    Type: String
+Resources:
+  CloudBuildIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service: codebuild.amazonaws.com
+        Version: '2012-10-17'
+      Path: "/"
+      Policies: []
+      RoleName: !Sub codebuild-${AWS::StackName}-role
+  CloudBuildIAMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: IAM Policy
+      ManagedPolicyName: !Sub CodeBuildBasePolicy-${AWS::StackName}-policy
+      PolicyDocument:
+        Statement:
+        - Action:
+          - "sts:GetServiceBearerToken"
+          - "ecr-public:GetAuthorizationToken"
+          - "ecr-public:BatchCheckLayerAvailability"
+          - "ecr-public:PutImage"
+          - "ecr-public:InitiateLayerUpload"
+          - "ecr-public:UploadLayerPart"
+          - "ecr-public:CompleteLayerUpload"
+          Effect: Allow
+          Resource: '*'
+        - Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Effect: Allow
+          Resource:
+          - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-AMD64"
+          - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-AMD64:*"
+          - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-ARM64"
+          - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-ARM64:*"
+          - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-Manifest"
+          - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-Manifest:*"
+        - Action:
+          - s3:PutObject
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - s3:GetBucketAcl
+          - s3:GetBucketLocation
+          Effect: Allow
+          Resource:
+          - !Sub "arn:aws:s3:::codepipeline-${AWS::Region}-*"
+        - Action:
+          - codebuild:CreateReportGroup
+          - codebuild:CreateReport
+          - codebuild:UpdateReport
+          - codebuild:BatchPutTestCases
+          - codebuild:BatchPutCodeCoverages
+          Effect: Allow
+          Resource:
+          - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${AWS::StackName}-*"
+        Version: '2012-10-17'
+      Roles:
+      - !Ref CloudBuildIAMRole
+  CloudBuildECRPublic:
+    Type: AWS::ECR::PublicRepository
+    Properties:
+      RepositoryPolicyText:
+          Version: "2008-10-17"
+          Statement:
+              -
+                Sid: AllowPush
+                Effect: Allow
+                Principal:
+                  AWS:
+                    - !Sub arn:aws:iam::${AWS::AccountId}:root
+                Action:
+                  - "ecr-public:BatchCheckLayerAvailability"
+                  - "ecr-public:PutImage"
+                  - "ecr-public:InitiateLayerUpload"
+                  - "ecr-public:UploadLayerPart"
+                  - "ecr-public:CompleteLayerUpload"
+      RepositoryName: !Sub ${AWS::StackName}
+      RepositoryCatalogData:
+        UsageText: "This is a sample usage text."
+        AboutText: "This is a sample about text."
+        OperatingSystems:
+          - "Linux"
+        Architectures:
+          - "x86-64"
+          # - "ARM"
+          - "ARM 64"
+        RepositoryDescription: "This is a sample repository description."
+  CodeBuildProjectAMD64:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-AMD64"
+      Description: !Sub "A codebuild project to build ${AWS::StackName} AMD64"
+      ServiceRole: !Ref CloudBuildIAMRole
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER   # for ARM we should use ARM_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+        - Name: AWS_DEFAULT_REGION
+          Value: !Ref AWS::Region
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
+        - Name: IMAGE_TAG
+          Value: "latest-amd64"
+        - Name: IMAGE_REPO_NAMESPACE
+          Value: !Ref ECRPublicNamespace
+        - Name: IMAGE_REPO_NAME
+          Value: !Ref AWS::StackName
+      Source:
+        Location: "https://github.com/rolinux/hs110-exporter"
+        Type: GITHUB
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo Logging in to Amazon ECR...
+                - aws ecr-public get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin public.ecr.aws/$IMAGE_REPO_NAMESPACE
+            build:
+              commands:
+                - echo Build started on `date`
+                - echo Building the Docker image...
+                - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+                - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:$IMAGE_TAG
+            post_build:
+              commands:
+                - echo Build completed on `date`
+                - echo Pushing the Docker image...
+                - docker push public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:$IMAGE_TAG
+      TimeoutInMinutes: 5
+      QueuedTimeoutInMinutes: 5
+      Tags: 
+        - Key: "Name"
+          Value: !Sub "${AWS::StackName}-AMD64"
+        - Key: "Owner"
+          Value: "Radu"
+  CodeBuildProjectARM64:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-ARM64"
+      Description: !Sub "A codebuild project to build ${AWS::StackName} ARM64"
+      ServiceRole: !Ref CloudBuildIAMRole
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: ARM_CONTAINER # for AMD64 we should use LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: aws/codebuild/amazonlinux2-aarch64-standard:2.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+        - Name: AWS_DEFAULT_REGION
+          Value: !Ref AWS::Region
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
+        - Name: IMAGE_TAG
+          Value: "latest-arm64v8"
+        - Name: IMAGE_REPO_NAMESPACE
+          Value: !Ref ECRPublicNamespace
+        - Name: IMAGE_REPO_NAME
+          Value: !Ref AWS::StackName
+      Source:
+        Location: "https://github.com/rolinux/hs110-exporter"
+        Type: GITHUB
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo Logging in to Amazon ECR...
+                - aws ecr-public get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin public.ecr.aws/$IMAGE_REPO_NAMESPACE
+            build:
+              commands:
+                - echo Build started on `date`
+                - echo Building the Docker image...
+                - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+                - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:$IMAGE_TAG
+            post_build:
+              commands:
+                - echo Build completed on `date`
+                - echo Pushing the Docker image...
+                - docker push public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:$IMAGE_TAG
+      TimeoutInMinutes: 5
+      QueuedTimeoutInMinutes: 5
+      Tags: 
+        - Key: "Name"
+          Value: !Sub "${AWS::StackName}-ARM64"
+        - Key: "Owner"
+          Value: "Radu"
+  CodeBuildProjectManifest:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-Manifest"
+      Description: !Sub "A codebuild project to build ${AWS::StackName} Manifests"
+      ServiceRole: !Ref CloudBuildIAMRole
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER   # for ARM we should use ARM_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+        - Name: AWS_DEFAULT_REGION
+          Value: !Ref AWS::Region
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
+        - Name: IMAGE_TAG
+          Value: "latest"
+        - Name: IMAGE_REPO_NAMESPACE
+          Value: !Ref ECRPublicNamespace
+        - Name: IMAGE_REPO_NAME
+          Value: !Ref AWS::StackName
+      Source:
+        Location: "https://github.com/rolinux/hs110-exporter"
+        Type: GITHUB
+        BuildSpec: "buildspec-manifest.yml"
+        BuildSpec: |
+          version: 0.2
+          # Based on the Docker documentation, must include the DOCKER_CLI_EXPERIMENTAL environment variable
+          # https://docs.docker.com/engine/reference/commandline/manifest/
+          phases:
+            pre_build:
+              commands:
+                - echo Logging in to Amazon ECR...
+                - aws ecr-public get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin public.ecr.aws/$IMAGE_REPO_NAMESPACE
+            build:
+              commands:
+                - echo Build started on `date`
+                - echo Building the Docker manifest...
+                - export DOCKER_CLI_EXPERIMENTAL=enabled
+                - docker manifest create public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:latest-arm64v8 public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:latest-amd64
+                - docker manifest annotate --arch arm64 public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:latest-arm64v8
+                - docker manifest annotate --arch amd64 public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME:latest-amd64
+            post_build:
+              commands:
+                - echo Build completed on `date`
+                - echo Pushing the Docker image...
+                - docker manifest push public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME
+                - docker manifest inspect public.ecr.aws/$IMAGE_REPO_NAMESPACE/$IMAGE_REPO_NAME
+      TimeoutInMinutes: 5
+      QueuedTimeoutInMinutes: 5
+      Tags: 
+        - Key: "Name"
+          Value: !Sub "${AWS::StackName}-Manifest"
+        - Key: "Owner"
+          Value: "Radu"
