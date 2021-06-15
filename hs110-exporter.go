@@ -211,20 +211,17 @@ func recordMetrics() {
 
 			// a HS100 will return 0
 			if totalWh != 0 {
+				hs110TotalWattHours.WithLabelValues(targetHS110, mac, alias).Set(float64(totalWh))
+				hs110VoltageMilliVolts.WithLabelValues(targetHS110, mac, alias).Set(float64(voltageMv))
+				hs110CurrentMilliAmps.WithLabelValues(targetHS110, mac, alias).Set(float64(currentMa))
+				hs110PowerMilliWatts.WithLabelValues(targetHS110, mac, alias).Set(float64(powerMw))
+
 				// totalWh can still be above 0 with current powerMw == 0
 				logSlice = append(logSlice, fmt.Sprintf("watthours:%d", totalWh))
-				hs110TotalWattHours.WithLabelValues(targetHS110, mac, alias).Set(float64(totalWh))
+				logSlice = append(logSlice, fmt.Sprintf("millivolts:%d", voltageMv))
+				logSlice = append(logSlice, fmt.Sprintf("milliamps:%d", currentMa))
+				logSlice = append(logSlice, fmt.Sprintf("milliwatts:%d", powerMw))
 
-				if powerMw != 0 {
-					logSlice = append(logSlice, fmt.Sprintf("millivolts:%d", voltageMv))
-					hs110VoltageMilliVolts.WithLabelValues(targetHS110, mac, alias).Set(float64(voltageMv))
-
-					logSlice = append(logSlice, fmt.Sprintf("milliamps:%d", currentMa))
-					hs110CurrentMilliAmps.WithLabelValues(targetHS110, mac, alias).Set(float64(currentMa))
-
-					logSlice = append(logSlice, fmt.Sprintf("milliwatts:%d", powerMw))
-					hs110PowerMilliWatts.WithLabelValues(targetHS110, mac, alias).Set(float64(powerMw))
-				}
 				log.SetOutput(os.Stdout)
 				log.Printf("Target '%s' HS110 data: %s ", targetHS110, strings.Join(logSlice, " "))
 			} else {
