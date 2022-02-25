@@ -1,4 +1,4 @@
-project_name: tiny
+project_name: hs110-exporter
 builds:
   - env: [CGO_ENABLED=0]
     goos:
