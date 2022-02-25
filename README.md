@@ -10,7 +10,7 @@ I run my hs110-exporter(s) using a command like:
 
 ```
 $ sudo docker run -dit --restart always -e TARGET_HS110=192.168.252.57 \
- -p 9498:9498 --name hs110-exporter-57 rolinux/hs110-exporter:latest
+ -p 9498:9498 --name hs110-exporter-57 ghcr.io/rolinux/hs110-exporter:latest
 ```
 
 Notes:
