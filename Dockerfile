@@ -1,4 +1,4 @@
-FROM mirror.gcr.io/library/golang AS build
+FROM golang AS build
 
 ENV DISTRIBUTION_DIR /go/src/github.com/rolinux/hs110-exporter
 
