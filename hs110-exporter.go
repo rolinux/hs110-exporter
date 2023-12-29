@@ -106,46 +106,49 @@ var (
 type hs110 struct {
 	System struct {
 		GetSysinfo struct {
-			SwVer      string `json:"sw_ver"`
-			HwVer      string `json:"hw_ver"`
-			Type       string `json:"type"`
-			Model      string `json:"model"`
-			MAC        string `json:"mac"`
-			DevName    string `json:"dev_name"`
-			Alias      string `json:"alias"`
-			RelayState int    `json:"relay_state"`
-			OnTime     int    `json:"on_time"`
 			ActiveMode string `json:"active_mode"`
+			Alias      string `json:"alias"`
+			DeviceID   string `json:"deviceId"`
+			DevName    string `json:"dev_name"`
+			ErrCode    int    `json:"err_code"`
 			Feature    string `json:"feature"`
-			Updating   int    `json:"updating"`
+			FwID       string `json:"fwId,omitempty"`
+			HwID       string `json:"hwId"`
+			HwVer      string `json:"hw_ver"`
 			IconHash   string `json:"icon_hash"`
-			Rssi       int    `json:"rssi"`
+			LatitudeI  int    `json:"latitude_i"`
 			LedOff     int    `json:"led_off"`
 			LongitudeI int    `json:"longitude_i"`
-			LatitudeI  int    `json:"latitude_i"`
-			HwID       string `json:"hwId"`
-			FwID       string `json:"fwId"`
-			DeviceID   string `json:"deviceId"`
-			OemID      string `json:"oemId"`
+			MAC        string `json:"mac"`
+			MicType    string `json:"mic_type,omitempty"`
+			Model      string `json:"model"`
 			NextAction struct {
 				Type int `json:"type"`
 			} `json:"next_action"`
-			NtcState int `json:"ntc_state"`
-			ErrCode  int `json:"err_code"`
+			NtcState   int    `json:"ntc_state"`
+			ObdSrc     string `json:"obd_src,omitempty"`
+			OemID      string `json:"oemId"`
+			OnTime     int    `json:"on_time"`
+			RelayState int    `json:"relay_state"`
+			Rssi       int    `json:"rssi"`
+			Status     string `json:"status,omitempty"`
+			SwVer      string `json:"sw_ver"`
+			Type       string `json:"type,omitempty"`
+			Updating   int    `json:"updating"`
 		} `json:"get_sysinfo"`
 	} `json:"system"`
 	Emeter struct {
 		GetRealtime struct {
-			VoltageMv int `json:"voltage_mv"`
 			CurrentMa int `json:"current_ma"`
+			ErrCode   int `json:"err_code"`
 			PowerMw   int `json:"power_mw"`
 			TotalWh   int `json:"total_wh"`
-			ErrCode   int `json:"err_code"`
+			VoltageMv int `json:"voltage_mv"`
 		} `json:"get_realtime"`
 		GetVgainIgain struct {
-			Vgain   int `json:"vgain"`
-			Igain   int `json:"igain"`
 			ErrCode int `json:"err_code"`
+			Igain   int `json:"igain"`
+			Vgain   int `json:"vgain"`
 		} `json:"get_vgain_igain"`
 	} `json:"emeter"`
 }
