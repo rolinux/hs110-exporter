@@ -174,7 +174,7 @@ func recordMetrics() {
 			err = json.Unmarshal([]byte(results), &meterInfo) // here!
 
 			if err != nil {
-				log.Println("Target not a HS110 - err:", err)
+				log.Println("Target not a HS110/KP115 - err:", err)
 				// if target not responding sleep
 				time.Sleep(1 * time.Minute)
 				continue
